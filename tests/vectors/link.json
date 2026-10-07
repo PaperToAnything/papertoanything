@@ -1,0 +1,76 @@
+{
+  "about": "payload = base64url_nopad(deflate_raw(utf8(json))). 'json' is the exact string to compress (JSON.stringify(spec) gives it). Decoders MUST turn 'fragment' back into 'spec' (deep-equal). Encoders SHOULD produce 'fragment'; a different DEFLATE implementation may legitimately produce different bytes, which is fine as long as the other side decodes them to the same spec.",
+  "spec": {
+    "v": 1,
+    "name": "tiny µ-attn — ü",
+    "blocks": [
+      {
+        "id": "t0",
+        "kind": "tokens",
+        "params": {
+          "vocab": 50
+        },
+        "inputs": []
+      },
+      {
+        "id": "e0",
+        "kind": "embedding",
+        "label": "embed",
+        "params": {
+          "vocab": 50,
+          "d": 64
+        },
+        "inputs": [
+          "t0"
+        ]
+      },
+      {
+        "id": "a1",
+        "kind": "attention",
+        "label": "L1 attention",
+        "params": {
+          "heads": 4,
+          "causal": true
+        },
+        "inputs": [
+          "e0"
+        ]
+      },
+      {
+        "id": "u0",
+        "kind": "unembed",
+        "params": {
+          "vocab": 50,
+          "d": 64,
+          "tiedTo": "e0"
+        },
+        "inputs": [
+          "a1"
+        ],
+        "at": {
+          "x": 0,
+          "y": 120.5
+        }
+      }
+    ],
+    "output": "u0",
+    "train": {
+      "optimizer": "adamw",
+      "lr": 0.003,
+      "batch": 32,
+      "steps": 500,
+      "seed": 42
+    },
+    "origin": {
+      "kind": "lab"
+    }
+  },
+  "json": "{\"v\":1,\"name\":\"tiny µ-attn — ü\",\"blocks\":[{\"id\":\"t0\",\"kind\":\"tokens\",\"params\":{\"vocab\":50},\"inputs\":[]},{\"id\":\"e0\",\"kind\":\"embedding\",\"label\":\"embed\",\"params\":{\"vocab\":50,\"d\":64},\"inputs\":[\"t0\"]},{\"id\":\"a1\",\"kind\":\"attention\",\"label\":\"L1 attention\",\"params\":{\"heads\":4,\"causal\":true},\"inputs\":[\"e0\"]},{\"id\":\"u0\",\"kind\":\"unembed\",\"params\":{\"vocab\":50,\"d\":64,\"tiedTo\":\"e0\"},\"inputs\":[\"a1\"],\"at\":{\"x\":0,\"y\":120.5}}],\"output\":\"u0\",\"train\":{\"optimizer\":\"adamw\",\"lr\":0.003,\"batch\":32,\"steps\":500,\"seed\":42},\"origin\":{\"kind\":\"lab\"}}",
+  "utf8Length": 529,
+  "deflateRawHex": "8551414ec33010fc4ab467532569cac16fe0c8adea6113af5a2b891d2576a1449678045fe1c6097ec24b58d3567125246ebbeb99d999f50c47908500833d8104a7cd29fb7cbf43e74cf6fdfa967d7d8080bab34d3b81dccea05544e53c6cb5f9ad6d4b66e27ec0117b06cd70b40dd620377910a0cde05da4ee82b8b02961535f9352daec79d4614ddd75f6b7a00026dd57a96e34b36863b1687306324e5b93683f14593a5e561c081517958006fd848c75a3a79b45942ef249086ffeb72cf8b4a41eed39ff8d2e7bde09761b69cf209971e22f29f3d526047eb0de31f2bad28da84d44dac1e95ebfd018932aec9f624a6ef2559eaff9cbd0350790eb52c0e46898a215569e887dcaaa640376d4fbb3d42506df0842f801",
+  "payload": "hVFBTsMwEPxKtGdTJWnKwW_gyK3qYROvWiuJHSV2oUSWeARf4cYJfsJLWNNWcSUkbrvrmdmZ9QxHkIUAgz2BBKfNKft8v0PnTPb9-pZ9fYCAurNNO4HczqBVROU8bLX5rW1LZuJ-wBF7Bs1wtA3WIDd5EKDN4F2k7oK4sClhU1-TUtrsedRhTd119regACbdV6luNLNoY7FocwYyTluTaD8UWTpeVhwIFReVgAb9hIx1o6ebRZQu8kkIb_63LPi0pB7tOf-NLnveCXYbac8gmXHiLynz1SYEfrDeMfK60o2oTUTawelev9AYkyrsn2JKbvJVnq_5y9A1B5DrUsDkaJiiFVaeiH3KqmQDdtT7s9QlBt8IQvgB",
+  "fragment": "#s=hVFBTsMwEPxKtGdTJWnKwW_gyK3qYROvWiuJHSV2oUSWeARf4cYJfsJLWNNWcSUkbrvrmdmZ9QxHkIUAgz2BBKfNKft8v0PnTPb9-pZ9fYCAurNNO4HczqBVROU8bLX5rW1LZuJ-wBF7Bs1wtA3WIDd5EKDN4F2k7oK4sClhU1-TUtrsedRhTd119regACbdV6luNLNoY7FocwYyTluTaD8UWTpeVhwIFReVgAb9hIx1o6ebRZQu8kkIb_63LPi0pB7tOf-NLnveCXYbac8gmXHiLynz1SYEfrDeMfK60o2oTUTawelev9AYkyrsn2JKbvJVnq_5y9A1B5DrUsDkaJiiFVaeiH3KqmQDdtT7s9QlBt8IQvgB",
+  "url": "https://lab.papertoanything.com/#s=hVFBTsMwEPxKtGdTJWnKwW_gyK3qYROvWiuJHSV2oUSWeARf4cYJfsJLWNNWcSUkbrvrmdmZ9QxHkIUAgz2BBKfNKft8v0PnTPb9-pZ9fYCAurNNO4HczqBVROU8bLX5rW1LZuJ-wBF7Bs1wtA3WIDd5EKDN4F2k7oK4sClhU1-TUtrsedRhTd119regACbdV6luNLNoY7FocwYyTluTaD8UWTpeVhwIFReVgAb9hIx1o6ebRZQu8kkIb_63LPi0pB7tOf-NLnveCXYbac8gmXHiLynz1SYEfrDeMfK60o2oTUTawelev9AYkyrsn2JKbvJVnq_5y9A1B5DrUsDkaJiiFVaeiH3KqmQDdtT7s9QlBt8IQvgB",
+  "zlib": "level 6, wbits -15, memLevel 8, default strategy",
+  "payloadNode": "hY9LTsNAEESvYtW6icb5sJgzsGSHsmh7Wsko9ozlaQdCZIlDcBV2rOAmnAQNSRQjIbFrlbpeVR2xhy0JgVuBhfpwKD7eblg1FF8vr8XnOwhVE-tdgn04wrv8ZUDY-fBzx52EBELHPbcJ9oh9rLmCXZmR4EM3aLauRzq7ZeKWthLnfNiA0HAlzUX7G0hwsLfLKTeXubK5vLJZVYL6GCbsu7KYyteIrbBLsEtCzUPiBlb7QX4FyTRomIwYwv-VCerF3cfT_l9cLrEmsGbbE6whHGDLuZmtxnFNiIN2g14itWcf8mfs1Lf-Wfq81HH7mFf2sGZmzIJQsdZb2MWckFS6lKsYQhJxsMv5SIi935xQ5xkNVxjHbw"
+}
