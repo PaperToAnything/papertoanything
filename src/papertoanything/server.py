@@ -1,20 +1,21 @@
-"""The local bridge: a same-origin HTTP server on 127.0.0.1.
+"""The local bridge: an HTTP server on 127.0.0.1 that serves only data.
 
-Serves the Lab's static build (when one is available) and four data
-endpoints, all on the loopback interface only:
+It serves no web page. The Lab (https://lab.papertoanything.com) is opened in
+your browser with ``?bridge=http://127.0.0.1:PORT&token=...`` and reads these
+endpoints directly:
 
     GET /spec              BridgeHello JSON
     GET /trace             latest TraceFrame JSON (204 when none yet)
     GET /health?since=N    {"frames": [HealthFrame, ...]} with step > N
     GET /events            Server-Sent Events: hello, spec, frame, health, bye
+    GET /                  a plain-text note (no token needed)
 
-The data endpoints require ``?token=<session token>`` (or the header
-``X-PTA-Token``). The token is random per server and only appears in the URL
-this process opens. Requests whose Host header is not this loopback address
-are refused (DNS-rebinding guard), and requests carrying an Origin or
-``Sec-Fetch-Site`` that is not this exact origin are refused, so no other
-website open in the same browser can read the data. No CORS headers are ever
-sent: the Lab is served from the same origin and does not need them.
+The data endpoints require the random per-session token, as ``?token=``, the
+header ``X-PTA-Token`` or ``Authorization: Bearer``. Requests whose Host
+header is not this loopback address are refused (DNS-rebinding guard). A
+request that carries an Origin header is refused unless the origin is this
+server itself or one of the allowed Lab origins; only those origins receive
+CORS headers (never ``*``).
 
 Runs in a daemon thread, so it never blocks a notebook or script.
 """
@@ -23,7 +24,6 @@ from __future__ import annotations
 
 import hmac
 import json
-import mimetypes
 import os
 import queue
 import secrets
@@ -31,30 +31,25 @@ import threading
 import time
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 from urllib.parse import parse_qs, urlsplit
 
 from .spec import BridgeHello, HealthFrame, ModelSpec, TraceFrame, dumps
 
-__all__ = ["LocalServer", "bundled_lab_dir", "find_lab_dir"]
+__all__ = ["LocalServer", "LAB_URL", "LAB_ORIGINS"]
 
 HEALTH_HISTORY = 5000
 KEEPALIVE_SECONDS = 15.0
 
+#: The hosted Lab that opens a bridge.
+LAB_URL = "https://lab.papertoanything.com"
+#: Origins allowed to read the bridge (exact match): the hosted Lab and the Lab dev server.
+LAB_ORIGINS = ("https://lab.papertoanything.com", "http://localhost:5180")
 
-def bundled_lab_dir() -> Path:
-    return Path(__file__).resolve().parent / "_lab"
 
-
-def find_lab_dir(lab_dir: Optional[Union[str, os.PathLike]] = None) -> Optional[Path]:
-    """The Lab build to serve: explicit dir, then $PTA_LAB_DIR, then the
-    bundled ``papertoanything/_lab``. Only a directory containing
-    ``index.html`` counts."""
-    for cand in (lab_dir, os.environ.get("PTA_LAB_DIR"), bundled_lab_dir()):
-        if cand and (Path(cand) / "index.html").is_file():
-            return Path(cand).resolve()
-    return None
+def _origin_of(url: str) -> str:
+    p = urlsplit(url)
+    return f"{p.scheme}://{p.netloc}".lower()
 
 
 class _Subscriber:
@@ -87,7 +82,7 @@ class LocalServer:
     def __init__(
         self,
         spec: Optional[ModelSpec] = None,
-        lab_dir: Optional[Union[str, os.PathLike]] = None,
+        lab_url: Optional[str] = None,
         host: str = "127.0.0.1",
         port: int = 0,
         token: Optional[str] = None,
@@ -98,7 +93,8 @@ class LocalServer:
         self.host = "127.0.0.1" if host == "localhost" else host
         self.requested_port = port
         self.token = token or secrets.token_urlsafe(24)
-        self.lab_dir = find_lab_dir(lab_dir)
+        self.lab_url = (lab_url or os.environ.get("PTA_LAB_URL") or LAB_URL).rstrip("/")
+        self.allowed_origins = {o.lower() for o in LAB_ORIGINS} | {_origin_of(self.lab_url)}
         self.name = name or (spec.name if spec else "model")
         self._spec = spec
         self._trace: Optional[TraceFrame] = None
@@ -140,8 +136,8 @@ class LocalServer:
 
     @property
     def url(self) -> str:
-        """The page to open: ``http://127.0.0.1:PORT/?bridge=local&token=...``."""
-        return f"{self.origin}/?bridge=local&token={self.token}"
+        """The Lab page to open: ``https://lab.papertoanything.com/?bridge=http://127.0.0.1:PORT&token=...``."""
+        return f"{self.lab_url}/?bridge={self.origin}&token={self.token}"
 
     def close(self) -> None:
         if self._closed.is_set():
@@ -260,7 +256,16 @@ class _Handler(BaseHTTPRequestHandler):
         return {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
 
     def _allowed_origins(self) -> set:
-        return {"http://" + h for h in self._allowed_hosts()}
+        return {"http://" + h for h in self._allowed_hosts()} | self.bridge.allowed_origins
+
+    def _cors(self) -> Dict[str, str]:
+        origin = (self.headers.get("Origin") or "").lower()
+        if origin and origin in self.bridge.allowed_origins:
+            h = {"Access-Control-Allow-Origin": origin, "Vary": "Origin"}
+            if self.headers.get("Access-Control-Request-Private-Network"):
+                h["Access-Control-Allow-Private-Network"] = "true"
+            return h
+        return {}
 
     def _check_common(self) -> bool:
         host = (self.headers.get("Host") or "").lower()
@@ -275,10 +280,12 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _check_token(self, query: Dict[str, List[str]]) -> bool:
         site = self.headers.get("Sec-Fetch-Site")
-        if site is not None and site not in ("same-origin", "none"):
+        if site is not None and site not in ("same-origin", "none") and self.headers.get("Origin") is None:
             self._send(403, "text/plain", b"cross-site request refused\n")
             return False
-        given = (query.get("token") or [self.headers.get("X-PTA-Token") or ""])[0]
+        auth = self.headers.get("Authorization") or ""
+        bearer = auth[7:] if auth.lower().startswith("bearer ") else ""
+        given = (query.get("token") or [self.headers.get("X-PTA-Token") or bearer])[0]
         if not given:
             self._send(401, "text/plain", b"missing token\n")
             return False
@@ -297,9 +304,10 @@ class _Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Cross-Origin-Resource-Policy", "same-origin")
-        self.send_header("X-Frame-Options", "SAMEORIGIN")
-        for k, v in (extra or {}).items():
+        self.send_header("X-Frame-Options", "DENY")
+        merged = dict(self._cors())
+        merged.update(extra or {})
+        for k, v in merged.items():
             self.send_header(k, v)
         self.end_headers()
 
@@ -313,8 +321,15 @@ class _Handler(BaseHTTPRequestHandler):
 
     # methods -------------------------------------------------------------------
 
-    def do_OPTIONS(self) -> None:  # no CORS, ever
-        self._send(405, "text/plain", b"method not allowed\n")
+    def do_OPTIONS(self) -> None:  # CORS preflight, only for the allowed Lab origins
+        if not self._check_common():
+            return
+        cors = self._cors()
+        if not cors:
+            self._send(403, "text/plain", b"cross-origin request refused\n")
+            return
+        cors.update({"Access-Control-Allow-Methods": "GET, HEAD, OPTIONS", "Access-Control-Allow-Headers": "Authorization, X-PTA-Token", "Access-Control-Max-Age": "600"})
+        self._headers(204, "text/plain", 0, cors)
 
     def do_POST(self) -> None:
         self._send(405, "text/plain", b"method not allowed\n")
@@ -355,7 +370,10 @@ class _Handler(BaseHTTPRequestHandler):
             else:
                 self._events()
             return
-        self._static(path)
+        if path in ("/", "/index.html"):
+            self._send(200, "text/plain; charset=utf-8", b"papertoanything bridge. Open the Lab with the link that pta printed.\n")
+        else:
+            self._send(404, "text/plain", b"not found\n")
 
     def _events(self) -> None:
         b = self.bridge
@@ -387,37 +405,3 @@ class _Handler(BaseHTTPRequestHandler):
         finally:
             b._unsubscribe(sub)
             self.close_connection = True
-
-    def _static(self, path: str) -> None:
-        lab = self.bridge.lab_dir
-        if lab is None:
-            if path in ("/", "/index.html"):
-                from ._viewer import VIEWER_HTML
-
-                body = VIEWER_HTML.encode("utf-8")
-                self._headers(200, "text/html; charset=utf-8", len(body), {"Content-Security-Policy": "default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:"})
-                if self.command != "HEAD":
-                    self.wfile.write(body)
-            else:
-                self._send(404, "text/plain", b"not found\n")
-            return
-        rel = path.lstrip("/") or "index.html"
-        try:
-            target = (lab / rel).resolve()
-            target.relative_to(lab)
-        except (ValueError, OSError):
-            self._send(404, "text/plain", b"not found\n")
-            return
-        if target.is_dir():
-            target = target / "index.html"
-        if not target.is_file():
-            if "." in rel.rsplit("/", 1)[-1]:
-                self._send(404, "text/plain", b"not found\n")
-                return
-            target = lab / "index.html"  # client-side routes
-        ctype = {".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".wasm": "application/wasm", ".json": "application/json", ".svg": "image/svg+xml"}.get(target.suffix.lower())
-        ctype = ctype or mimetypes.guess_type(str(target))[0] or "application/octet-stream"
-        if ctype.startswith("text/") or ctype in ("application/json",):
-            ctype += "; charset=utf-8"
-        body = target.read_bytes()
-        self._send(200, ctype, body)

@@ -388,6 +388,40 @@ class WatchTests(unittest.TestCase):
             with urllib.request.urlopen(f"http://127.0.0.1:{s.port}/spec?token={s.token}", timeout=5) as r:
                 self.assertEqual(json.loads(r.read())["spec"]["name"], "TinyGPT")
 
+    def test_health_frames_over_sse(self):
+        import papertoanything as pta
+        from papertoanything.server import LocalServer
+        from test_server import SSE
+
+        model = self.TinyGPT()
+        opt = torch.optim.SGD(model.parameters(), lr=0.1)
+        with LocalServer() as s:
+            with contextlib.redirect_stdout(io.StringIO()):
+                w = pta.watch(model, opt, every=2, open=False, server=s, run_file=False)
+            self.train(w, model, opt, 1)
+            sse = SSE(s, "/events?token=" + s.token)
+            try:
+                sse.next_event("hello")
+                self.train(w, model, opt, 2)
+                ev = sse.next_event("health")
+                self.assertEqual(ev["step"], 2)
+                self.assertTrue(ev["blocks"])
+            finally:
+                sse.close()
+                w.close()
+
+    def test_frames_list_is_bounded(self):
+        import papertoanything as pta
+
+        model = self.TinyGPT()
+        opt = torch.optim.SGD(model.parameters(), lr=0.01)
+        with pta.watch(model, opt, every=1, open=False, run_file=False) as w:
+            self.train(w, model, opt, 1)
+            f = w.frames[0]
+            w.frames.extend([f] * 10000)
+            w._emit(f)
+        self.assertEqual(len(w.frames), 5002)
+
     def test_integrations_import_guarded(self):
         if HAVE_HF:
             from papertoanything.integrations.hf import PTACallback

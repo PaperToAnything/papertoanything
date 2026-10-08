@@ -2,7 +2,7 @@
 
 One line in a training script or notebook::
 
-    w = pta.watch(model, optimizer)          # opens a local viewer tab
+    w = pta.watch(model, optimizer)          # opens the Lab on a local bridge
     for batch in data:
         loss = model(batch)
         loss.backward(); optimizer.step(); optimizer.zero_grad()
@@ -282,7 +282,7 @@ class Watch:
         warn_nonfinite: bool = True,
         spec: Optional[ModelSpec] = None,
         sinks: Optional[List[Callable[[HealthFrame], None]]] = None,
-        lab_dir: Optional[str] = None,
+        lab_url: Optional[str] = None,
     ) -> None:
         torch = _torch()
         if not isinstance(model, torch.nn.Module):
@@ -343,7 +343,7 @@ class Watch:
             self._handles.append(optimizer.register_step_post_hook(self._opt_post))
 
         if open or server is not None:
-            self._ensure_server(open_browser=open, lab_dir=lab_dir)
+            self._ensure_server(open_browser=open, lab_url=lab_url)
 
     # ── setup ────────────────────────────────────────────────────────────────
 
@@ -414,11 +414,11 @@ class Watch:
                 self._block_handles.append(child.register_forward_hook(post))
                 return
 
-    def _ensure_server(self, open_browser: bool, lab_dir: Optional[str]) -> None:
+    def _ensure_server(self, open_browser: bool, lab_url: Optional[str]) -> None:
         from .server import LocalServer
 
         if self.server is None:
-            self.server = LocalServer(spec=self.spec, lab_dir=lab_dir, name=type(self.model).__name__).start()
+            self.server = LocalServer(spec=self.spec, lab_url=lab_url, name=type(self.model).__name__).start()
         elif self.spec is not None:
             self.server.set_spec(self.spec)
         self.url = self.server.url
@@ -844,13 +844,13 @@ def watch(
     ``every``      emit one HealthFrame every N steps (hooks are idle between).
     ``val_loss``   a float, or a zero-argument callable evaluated every
                    ``val_every`` steps (default ``10 * every``).
-    ``open``       start the local viewer on 127.0.0.1 and open a browser tab.
+    ``open``       start the local bridge on 127.0.0.1 and open the hosted Lab on it.
 
     Keyword options: ``example_input`` (map the model now instead of on the
     first training forward), ``server`` (reuse a LocalServer), ``run_file``
     (path, or False to disable; default ``./pta-runs/<Model>-<time>.pta``),
     ``hist``, ``update_ratio``, ``attention``, ``val_every``,
     ``warn_nonfinite``, ``sinks`` (callables receiving each HealthFrame),
-    ``lab_dir``.
+    ``lab_url`` (a different Lab, e.g. a dev server).
     """
     return Watch(model, optimizer, every, val_loss, open, **kwargs)

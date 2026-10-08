@@ -25,7 +25,7 @@ examples:
   pta link spec.json                         spec file -> lab link
   pta decode 'https://lab.papertoanything.com/#s=...'
   pta save model.py:TinyNet -o tiny.pta --input-shape 1,2 --dtype float
-  pta serve --spec spec.json                 local viewer on 127.0.0.1
+  pta serve --spec spec.json                 local bridge on 127.0.0.1
 
 SOURCE is a spec JSON file, a .pta file, or path/to/file.py:Name (or
 package.module:Name) where Name is an nn.Module class (built with no
@@ -166,9 +166,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("-o", "--output", help="output path (default <name>.pta)")
     _add_input_args(s)
 
-    s = sub.add_parser("serve", help="serve the viewer on 127.0.0.1 until Ctrl+C")
+    s = sub.add_parser("serve", help="serve the bridge on 127.0.0.1 and open the Lab until Ctrl+C")
     s.add_argument("source", nargs="?", help="optional spec.json, .pta, or file.py:Name to show")
-    s.add_argument("--lab-dir", help="a built Lab directory to serve (default: $PTA_LAB_DIR, then the bundled build)")
+    s.add_argument("--lab-url", help="open this Lab instead of https://lab.papertoanything.com (default: $PTA_LAB_URL)")
     s.add_argument("--port", type=int, default=0, help="port on 127.0.0.1 (default: a free one)")
     s.add_argument("--no-open", action="store_true", help="do not open a browser")
     _add_input_args(s)
@@ -232,13 +232,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         spec = model = x = None
         if args.source:
             spec, model, x = _source(args)
-        server = LocalServer(spec=spec, lab_dir=args.lab_dir, port=args.port).start()
+        server = LocalServer(spec=spec, lab_url=args.lab_url, port=args.port).start()
         if model is not None and x is not None:
             from .torch import capture
 
             server.push(capture(model, x, spec=spec))
         print(f"serving on {server.url}")
-        print("lab build: " + (str(server.lab_dir) if server.lab_dir else "none found, serving the built-in viewer"))
+        print("bridge on " + server.origin + " (127.0.0.1 only); the Lab reads it from your browser")
         print("press Ctrl+C to stop")
         if not args.no_open and not os.environ.get("PTA_NO_BROWSER"):
             import webbrowser

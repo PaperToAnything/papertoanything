@@ -54,24 +54,25 @@ def _open(url: str, open_browser: bool) -> None:
             pass
 
 
-def show(model_or_spec: Any, example_input: Any = None, mode: str = "auto", *, open_browser: bool = True, path: Optional[str] = None, lab_dir: Optional[str] = None) -> Any:
+def show(model_or_spec: Any, example_input: Any = None, mode: str = "auto", *, open_browser: bool = True, path: Optional[str] = None, lab_url: Optional[str] = None) -> Any:
     """Show a model or spec in the Lab.
 
     mode="link"   print and open ``https://lab.papertoanything.com/#s=...``.
                   The spec travels only in the URL fragment, which browsers
                   never send to a server. Returns the URL.
-    mode="local"  start a server on 127.0.0.1 (random port, random token),
-                  push a TraceFrame when ``example_input`` is given, open it.
+    mode="local"  start a bridge on 127.0.0.1 (random port, random token),
+                  push a TraceFrame when ``example_input`` is given, and open
+                  the hosted Lab on it.
                   Returns the running ``LocalServer`` (``.push``, ``.watch``,
                   ``.close``).
     mode="file"   write a ``.pta`` file (``path``, default ``<name>.pta``)
                   to drop on the Lab. Returns the path.
-    mode="auto"   local when a Lab build is available, otherwise link.
+    mode="auto"   same as "link".
     """
-    from .server import LocalServer, find_lab_dir
+    from .server import LocalServer
 
     if mode == "auto":
-        mode = "local" if find_lab_dir(lab_dir) is not None else "link"
+        mode = "link"
     spec = as_spec(model_or_spec, example_input)
     if mode == "link":
         url = to_url(spec)
@@ -81,12 +82,12 @@ def show(model_or_spec: Any, example_input: Any = None, mode: str = "auto", *, o
         _open(url, open_browser)
         return url
     if mode == "local":
-        server = LocalServer(spec=spec, lab_dir=lab_dir).start()
+        server = LocalServer(spec=spec, lab_url=lab_url).start()
         if example_input is not None and _is_module(model_or_spec):
             from .torch import capture
 
             server.push(capture(model_or_spec, example_input, spec=spec))
-        print(f"papertoanything: serving {spec.name} at {server.url}")
+        print(f"papertoanything: serving {spec.name} to the Lab at {server.url}")
         _open(server.url, open_browser)
         return server
     if mode == "file":

@@ -1,5 +1,4 @@
 include README.md LICENSE
 recursive-include examples *.py
 recursive-include tests *.py *.json
-recursive-include src/papertoanything/_lab *
 global-exclude __pycache__ *.py[cod]

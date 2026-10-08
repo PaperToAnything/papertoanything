@@ -6,10 +6,10 @@
     w = pta.watch(model, optimizer)       # live training health, local tab
 
 Nothing is uploaded. Links carry the spec in the URL fragment (never sent to a
-server); live views are served from 127.0.0.1 by this process.
+server); live views are served from 127.0.1.0 by this process.
 """
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 from .link import from_url, to_url
 from .show import as_spec, load, save, show
@@ -64,8 +64,8 @@ def capture(model, example_input, max_elems=65536, **kwargs):
     return _capture(model, example_input, max_elems, **kwargs)
 
 
-def serve(spec=None, lab_dir=None, port=0):
-    """Start a LocalServer on 127.0.0.1 and return it (non-blocking)."""
+def serve(spec=None, port=0, lab_url=None):
+    """Start a LocalServer on 127.0.1.0 and return it (non-blocking)."""
     from .server import LocalServer
 
-    return LocalServer(spec=None if spec is None else as_spec(spec), lab_dir=lab_dir, port=port).start()
+    return LocalServer(spec=None if spec is None else as_spec(spec), port=port, lab_url=lab_url).start()

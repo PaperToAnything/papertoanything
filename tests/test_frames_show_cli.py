@@ -47,7 +47,8 @@ class ShowTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             s = show(SPEC, mode="local", open_browser=False)
         try:
-            self.assertIn("?bridge=local&token=", s.url)
+            self.assertIn("lab.papertoanything.com/?bridge=http://127.0.0.1:", s.url)
+            self.assertIn("&token=", s.url)
             self.assertEqual(s.spec.to_dict(), SPEC)
         finally:
             s.close()
@@ -65,8 +66,7 @@ class ShowTests(unittest.TestCase):
             self.assertEqual(spec.to_dict(), SPEC)
             self.assertIsNone(trace)
 
-    def test_auto_without_lab_is_link(self):
-        os.environ.pop("PTA_LAB_DIR", None)
+    def test_auto_is_link(self):
         with contextlib.redirect_stdout(io.StringIO()):
             out = show(SPEC, open_browser=False)
         self.assertTrue(isinstance(out, str) and "#s=" in out)

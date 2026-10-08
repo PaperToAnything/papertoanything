@@ -1,7 +1,6 @@
 import http.client
 import json
 import os
-import tempfile
 import time
 import unittest
 import urllib.error
@@ -65,7 +64,7 @@ class SSE:
 
 class ServerTests(unittest.TestCase):
     def setUp(self):
-        self.s = LocalServer(spec=SPEC, lab_dir=os.devnull).start()
+        self.s = LocalServer(spec=SPEC).start()
         self.base = f"http://127.0.0.1:{self.s.port}"
         self.tok = "token=" + self.s.token
 
@@ -73,7 +72,7 @@ class ServerTests(unittest.TestCase):
         self.s.close()
 
     def test_url_shape(self):
-        self.assertEqual(self.s.url, f"{self.base}/?bridge=local&token={self.s.token}")
+        self.assertEqual(self.s.url, f"https://lab.papertoanything.com/?bridge={self.base}&token={self.s.token}")
         self.assertGreaterEqual(len(self.s.token), 24)
         self.assertNotEqual(LocalServer().token, self.s.token)
 
@@ -101,13 +100,39 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(get(self.base + "/spec?" + self.tok, {"Sec-Fetch-Site": "cross-site"})[0], 403)
         self.assertEqual(get(self.base + "/spec?" + self.tok, {"Sec-Fetch-Site": "same-origin"})[0], 200)
 
+    def test_lab_origin_gets_exact_cors(self):
+        for origin in ("https://lab.papertoanything.com", "http://localhost:5180"):
+            status, headers, _ = get(self.base + "/spec?" + self.tok, {"Origin": origin, "Sec-Fetch-Site": "cross-site"})
+            self.assertEqual(status, 200, origin)
+            self.assertEqual(headers.get("Access-Control-Allow-Origin"), origin)
+            self.assertEqual(headers.get("Vary"), "Origin")
+        for origin in ("https://lab.papertoanything.com.evil.example", "http://localhost:5181", "null"):
+            self.assertEqual(get(self.base + "/spec?" + self.tok, {"Origin": origin})[0], 403, origin)
+        # the token is still required, even from the Lab
+        self.assertEqual(get(self.base + "/spec", {"Origin": "https://lab.papertoanything.com"})[0], 401)
+        # bearer header works
+        self.assertEqual(get(self.base + "/spec", {"Authorization": "Bearer " + self.s.token})[0], 200)
+
+    def test_preflight(self):
+        r, _ = raw_get(self.s.port, "/events", {"Origin": "https://lab.papertoanything.com", "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization", "Access-Control-Request-Private-Network": "true"}, method="OPTIONS")
+        self.assertEqual(r.status, 204)
+        self.assertEqual(r.getheader("Access-Control-Allow-Origin"), "https://lab.papertoanything.com")
+        self.assertEqual(r.getheader("Access-Control-Allow-Private-Network"), "true")
+        self.assertNotIn("*", r.getheader("Access-Control-Allow-Origin"))
+
+    def test_custom_lab_url_is_allowed(self):
+        with LocalServer(spec=SPEC, lab_url="http://localhost:9999/") as s:
+            self.assertTrue(s.url.startswith("http://localhost:9999/?bridge=http://127.0.0.1:"))
+            base = f"http://127.0.0.1:{s.port}"
+            self.assertEqual(get(base + "/spec?token=" + s.token, {"Origin": "http://localhost:9999"})[0], 200)
+
     def test_dns_rebinding_host_refused(self):
         r, _ = raw_get(self.s.port, "/spec?" + self.tok, {"Host": f"evil.example:{self.s.port}"}, skip_host=True)
         self.assertEqual(r.status, 421)
 
-    def test_no_cors_preflight(self):
+    def test_no_cors_for_unknown_origin_preflight(self):
         r, _ = raw_get(self.s.port, "/spec", {"Origin": "https://evil.example"}, method="OPTIONS")
-        self.assertIn(r.status, (403, 405))
+        self.assertEqual(r.status, 403)
         self.assertIsNone(r.getheader("Access-Control-Allow-Origin"))
 
     def test_loopback_only(self):
@@ -149,12 +174,35 @@ class ServerTests(unittest.TestCase):
         self.assertEqual([f["step"] for f in frames], [10, 20])
         self.assertEqual(get(self.base + "/health?since=x&" + self.tok)[0], 400)
 
-    def test_builtin_viewer_without_lab(self):
-        status, headers, body = get(self.base + "/?bridge=local&" + self.tok)
+    def test_serves_no_web_page(self):
+        status, _, body = get(self.base + "/")
         self.assertEqual(status, 200)
-        self.assertIn(b"EventSource", body)
-        self.assertIn("default-src 'self'", headers.get("Content-Security-Policy"))
+        self.assertNotIn(b"<html", body.lower())
         self.assertEqual(get(self.base + "/nope.js")[0], 404)
+        self.assertEqual(get(self.base + "/assets/app.js")[0], 404)
+
+    def test_health_ring_buffer(self):
+        from papertoanything import server as srv
+
+        old = srv.HEALTH_HISTORY
+        srv.HEALTH_HISTORY = 4
+        try:
+            with LocalServer(spec=SPEC) as s:
+                for step in range(10):
+                    s.push_health(HealthFrame(step=step, t=step, loss=1.0))
+                base = f"http://127.0.0.1:{s.port}"
+                frames = json.loads(get(base + "/health?since=-1&token=" + s.token)[2])["frames"]
+                self.assertEqual([f["step"] for f in frames], [6, 7, 8, 9])
+        finally:
+            srv.HEALTH_HISTORY = old
+
+    def test_events_readable_from_lab_origin(self):
+        conn = http.client.HTTPConnection("127.0.0.1", self.s.port, timeout=5)
+        conn.request("GET", "/events?" + self.tok, headers={"Origin": "https://lab.papertoanything.com", "Sec-Fetch-Site": "cross-site"})
+        r = conn.getresponse()
+        self.assertEqual(r.status, 200)
+        self.assertEqual(r.getheader("Access-Control-Allow-Origin"), "https://lab.papertoanything.com")
+        conn.close()
 
     def test_close_ends_stream(self):
         sse = SSE(self.s, "/events?" + self.tok)
@@ -164,46 +212,14 @@ class ServerTests(unittest.TestCase):
         sse.close()
 
 
-class LabDirTests(unittest.TestCase):
-    def test_serves_lab_build_and_blocks_traversal(self):
-        with tempfile.TemporaryDirectory() as d:
-            lab = os.path.join(d, "lab")
-            os.makedirs(os.path.join(lab, "assets"))
-            with open(os.path.join(lab, "index.html"), "w") as fh:
-                fh.write("<!doctype html><title>lab</title>")
-            with open(os.path.join(lab, "assets", "app.js"), "w") as fh:
-                fh.write("console.log(1)")
-            with open(os.path.join(d, "secret.txt"), "w") as fh:
-                fh.write("secret")
-            with LocalServer(spec=SPEC, lab_dir=lab) as s:
-                base = f"http://127.0.0.1:{s.port}"
-                status, _, body = get(base + "/?bridge=local&token=" + s.token)
-                self.assertEqual((status, body), (200, b"<!doctype html><title>lab</title>"))
-                status, headers, _ = get(base + "/assets/app.js")
-                self.assertEqual(status, 200)
-                self.assertTrue(headers.get("Content-Type").startswith("text/javascript"))
-                self.assertEqual(get(base + "/some/route")[2], b"<!doctype html><title>lab</title>")
-                for path in ("/../secret.txt", "/%2e%2e/secret.txt", "/assets/../../secret.txt"):
-                    _, body = raw_get(s.port, path)
-                    self.assertNotEqual(body, b"secret", path)
+class PackagingTests(unittest.TestCase):
+    def test_no_lab_bundled(self):
+        import importlib.util
+        import papertoanything
 
-    def test_env_lab_dir(self):
-        from papertoanything.server import find_lab_dir
-
-        with tempfile.TemporaryDirectory() as d:
-            open(os.path.join(d, "index.html"), "w").close()
-            os.environ["PTA_LAB_DIR"] = d
-            try:
-                self.assertEqual(os.path.realpath(str(find_lab_dir())), os.path.realpath(d))
-            finally:
-                del os.environ["PTA_LAB_DIR"]
-
-    def test_bundled_placeholder_is_not_a_lab(self):
-        from papertoanything.server import bundled_lab_dir, find_lab_dir
-
-        self.assertTrue((bundled_lab_dir() / "README.md").is_file())
-        os.environ.pop("PTA_LAB_DIR", None)
-        self.assertIsNone(find_lab_dir())
+        root = os.path.dirname(papertoanything.__file__)
+        self.assertFalse(os.path.exists(os.path.join(root, "_lab")))
+        self.assertIsNone(importlib.util.find_spec("papertoanything._viewer"))
 
 
 if __name__ == "__main__":

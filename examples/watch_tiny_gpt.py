@@ -6,9 +6,9 @@
     python watch_tiny_gpt.py --break lr      # learning rate far too high: divergence
 
 A nanoGPT-style character model (2 layers, 2 heads, d=32) learns a
-synthetic sequence on the CPU in about 200 steps. `pta.watch` opens a page on
-127.0.0.1 that shows loss, gradient norm and per-block statistics as it
-trains. Nothing leaves this machine.
+synthetic sequence on the CPU in about 200 steps. `pta.watch` starts a bridge on
+127.0.0.1 and opens the hosted Lab on it, which shows loss, gradient norm and
+per-block statistics as it trains. Nothing is uploaded.
 
 --break relu  swaps GELU for ReLU and starts the MLPs' first layer with a
               bias of -4, so almost every hidden unit outputs exactly zero
@@ -159,7 +159,7 @@ def main():
                 time.sleep(args.delay)
         print(f"done: {len(w.frames)} health frames; run file {w.run_file.path if w.run_file else '(none)'}")
         if not args.no_wait and w.server is not None:
-            print(f"viewer still at {w.url}; press Ctrl+C to exit")
+            print(f"bridge still at {w.url}; press Ctrl+C to exit")
             try:
                 while True:
                     time.sleep(1)
