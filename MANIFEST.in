@@ -2,3 +2,4 @@ include README.md LICENSE
 recursive-include examples *.py
 recursive-include tests *.py *.json
 global-exclude __pycache__ *.py[cod]
+include PYPI.md

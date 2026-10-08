@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "papertoanything"
 version = "0.1.0"
 description = "See a PyTorch model and its training in the Paper To Anything Lab. Nothing is uploaded."
-readme = "README.md"
+readme = "PYPI.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
