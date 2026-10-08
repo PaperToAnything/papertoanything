@@ -276,13 +276,13 @@ class WatchTests(unittest.TestCase):
                 w.step(loss)
 
     def test_watch_with_optimizer(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
         from papertoanything.health import RunFile
 
         model = self.TinyGPT()
         opt = torch.optim.AdamW(model.parameters(), lr=1e-2)
         rf = os.path.join(self.tmp.name, "run.pta")
-        w = pta.watch(model, opt, every=5, open=False, run_file=rf, val_loss=lambda: 1.25, val_every=5)
+        w = ptoa.watch(model, opt, every=5, open=False, run_file=rf, val_loss=lambda: 1.25, val_every=5)
         with w:
             self.train(w, model, opt, 12)
         self.assertEqual([f.step for f in w.frames], [0, 5, 10])
@@ -312,18 +312,18 @@ class WatchTests(unittest.TestCase):
         self.assertEqual([x.step for x in frames], [0, 5, 10])
 
     def test_watch_without_optimizer(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
 
         model = self.TinyGPT()
         opt = torch.optim.SGD(model.parameters(), lr=0.1)
-        with pta.watch(model, every=3, open=False, run_file=False) as w:
+        with ptoa.watch(model, every=3, open=False, run_file=False) as w:
             self.train(w, model, opt, 7)
         self.assertEqual([f.step for f in w.frames], [0, 3, 6])
         self.assertIsNotNone(w.frames[0].loss)
         self.assertTrue(any(b.updateRatio for b in w.frames[-1].blocks))
 
     def test_hooks_idle_between_samples(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
         from papertoanything import health
 
         calls = []
@@ -332,7 +332,7 @@ class WatchTests(unittest.TestCase):
         try:
             model = self.TinyGPT()
             opt = torch.optim.SGD(model.parameters(), lr=0.1)
-            with pta.watch(model, opt, every=100, open=False, run_file=False) as w:
+            with ptoa.watch(model, opt, every=100, open=False, run_file=False) as w:
                 self.train(w, model, opt, 1)
                 n = len(calls)
                 self.assertGreater(n, 0)
@@ -342,19 +342,19 @@ class WatchTests(unittest.TestCase):
             health.tensor_stats = orig
 
     def test_dead_relu_visible(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
 
         model = self.TinyGPT(act=nn.ReLU())
         for blk in model.transformer.h:
             nn.init.constant_(blk.mlp.c_fc.bias, -50.0)
         opt = torch.optim.SGD(model.parameters(), lr=0.01)
-        with pta.watch(model, opt, every=1, open=False, run_file=False) as w:
+        with ptoa.watch(model, opt, every=1, open=False, run_file=False) as w:
             self.train(w, model, opt, 2)
         mlp = next(b.id for b in w.spec.blocks if b.kind == "mlp")
         self.assertEqual(w.frames[-1].block(mlp).hidden.zeroFrac, 1.0)
 
     def test_nan_warning(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
 
         model = self.TinyGPT()
         with torch.no_grad():
@@ -362,7 +362,7 @@ class WatchTests(unittest.TestCase):
         opt = torch.optim.SGD(model.parameters(), lr=0.01)
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
-            with pta.watch(model, opt, every=1, open=False, run_file=False) as w:
+            with ptoa.watch(model, opt, every=1, open=False, run_file=False) as w:
                 self.train(w, model, opt, 1)
         self.assertTrue(any("NaN" in str(c.message) for c in caught))
         mlp = next(b.id for b in w.spec.blocks if b.kind == "mlp")
@@ -372,14 +372,14 @@ class WatchTests(unittest.TestCase):
     def test_streams_to_server(self):
         import urllib.request
 
-        import papertoanything as pta
+        import papertoanything as ptoa
         from papertoanything.server import LocalServer
 
         model = self.TinyGPT()
         opt = torch.optim.SGD(model.parameters(), lr=0.1)
         with LocalServer() as s:
             with contextlib.redirect_stdout(io.StringIO()):
-                w = pta.watch(model, opt, every=2, open=False, server=s, run_file=False)
+                w = ptoa.watch(model, opt, every=2, open=False, server=s, run_file=False)
             self.train(w, model, opt, 5)
             w.close()
             with urllib.request.urlopen(f"http://127.0.0.1:{s.port}/health?since=-1&token={s.token}", timeout=5) as r:
@@ -389,7 +389,7 @@ class WatchTests(unittest.TestCase):
                 self.assertEqual(json.loads(r.read())["spec"]["name"], "TinyGPT")
 
     def test_health_frames_over_sse(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
         from papertoanything.server import LocalServer
         from test_server import SSE
 
@@ -397,7 +397,7 @@ class WatchTests(unittest.TestCase):
         opt = torch.optim.SGD(model.parameters(), lr=0.1)
         with LocalServer() as s:
             with contextlib.redirect_stdout(io.StringIO()):
-                w = pta.watch(model, opt, every=2, open=False, server=s, run_file=False)
+                w = ptoa.watch(model, opt, every=2, open=False, server=s, run_file=False)
             self.train(w, model, opt, 1)
             sse = SSE(s, "/events?token=" + s.token)
             try:
@@ -411,11 +411,11 @@ class WatchTests(unittest.TestCase):
                 w.close()
 
     def test_frames_list_is_bounded(self):
-        import papertoanything as pta
+        import papertoanything as ptoa
 
         model = self.TinyGPT()
         opt = torch.optim.SGD(model.parameters(), lr=0.01)
-        with pta.watch(model, opt, every=1, open=False, run_file=False) as w:
+        with ptoa.watch(model, opt, every=1, open=False, run_file=False) as w:
             self.train(w, model, opt, 1)
             f = w.frames[0]
             w.frames.extend([f] * 10000)

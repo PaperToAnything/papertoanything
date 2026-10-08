@@ -6,7 +6,7 @@
     python watch_tiny_gpt.py --break lr      # learning rate far too high: divergence
 
 A nanoGPT-style character model (2 layers, 2 heads, d=32) learns a
-synthetic sequence on the CPU in about 200 steps. `pta.watch` starts a bridge on
+synthetic sequence on the CPU in about 200 steps. `ptoa.watch` starts a bridge on
 127.0.0.1 and opens the hosted Lab on it, which shows loss, gradient norm and
 per-block statistics as it trains. Nothing is uploaded.
 
@@ -25,7 +25,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import papertoanything as pta
+import papertoanything as ptoa
 
 
 class CausalSelfAttention(nn.Module):
@@ -84,7 +84,7 @@ class TinyGPT(nn.Module):
 
     def forward(self, idx, targets=None):
         b, t = idx.size()
-        assert t <= self.block_size  # control flow: pta falls back from fx to hooks
+        assert t <= self.block_size  # control flow: ptoa falls back from fx to hooks
         x = self.wte(idx) + self.wpe(torch.arange(t, device=idx.device))
         for block in self.h:
             x = block(x)
@@ -144,7 +144,7 @@ def main():
         model.train()
         return loss.item()
 
-    w = pta.watch(model, opt, every=args.every, val_loss=val_loss, open=not args.no_open, val_every=args.every * 4)
+    w = ptoa.watch(model, opt, every=args.every, val_loss=val_loss, open=not args.no_open, val_every=args.every * 4)
     with w:
         for step in range(args.steps):
             x, y = batch()

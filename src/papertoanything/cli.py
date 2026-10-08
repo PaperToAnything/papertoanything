@@ -1,4 +1,4 @@
-"""``pta``: the command-line half of papertoanything."""
+"""``ptoa``: the command-line half of papertoanything."""
 
 from __future__ import annotations
 
@@ -20,12 +20,12 @@ server), `serve` runs on 127.0.0.1 only, and `.pta` files stay on disk.
 
 EPILOG = """\
 examples:
-  pta inspect model.py:GPT --input-shape 1,64 --vocab 50304
-  pta inspect model.py:GPT --link            design view link for any size
-  pta link spec.json                         spec file -> lab link
-  pta decode 'https://lab.papertoanything.com/#s=...'
-  pta save model.py:TinyNet -o tiny.pta --input-shape 1,2 --dtype float
-  pta serve --spec spec.json                 local bridge on 127.0.0.1
+  ptoa inspect model.py:GPT --input-shape 1,64 --vocab 50304
+  ptoa inspect model.py:GPT --link            design view link for any size
+  ptoa link spec.json                         spec file -> lab link
+  ptoa decode 'https://lab.papertoanything.com/#s=...'
+  ptoa save model.py:TinyNet -o tiny.pta --input-shape 1,2 --dtype float
+  ptoa serve --spec spec.json                 local bridge on 127.0.0.1
 
 SOURCE is a spec JSON file, a .pta file, or path/to/file.py:Name (or
 package.module:Name) where Name is an nn.Module class (built with no
@@ -59,19 +59,19 @@ def _load_object(ref: str) -> Any:
     if left.endswith(".py") or os.path.sep in left or "/" in left:
         path = os.path.abspath(left)
         if not os.path.isfile(path):
-            raise SystemExit(f"pta: no such file: {left}")
+            raise SystemExit(f"ptoa: no such file: {left}")
         name = os.path.splitext(os.path.basename(path))[0]
         sys.path.insert(0, os.path.dirname(path))
         spec = importlib.util.spec_from_file_location(name, path)
         if spec is None or spec.loader is None:
-            raise SystemExit(f"pta: cannot import {left}")
+            raise SystemExit(f"ptoa: cannot import {left}")
         mod = importlib.util.module_from_spec(spec)
         sys.modules[name] = mod
         spec.loader.exec_module(mod)
     else:
         mod = importlib.import_module(left)
     if not hasattr(mod, attr):
-        raise SystemExit(f"pta: {left} has no attribute {attr}")
+        raise SystemExit(f"ptoa: {left} has no attribute {attr}")
     return getattr(mod, attr)
 
 
@@ -79,7 +79,7 @@ def _instantiate(obj: Any, ref: str) -> Any:
     try:
         import torch
     except ImportError:
-        raise SystemExit("pta: inspecting a model needs PyTorch: pip install 'papertoanything[torch]'") from None
+        raise SystemExit("ptoa: inspecting a model needs PyTorch: pip install 'papertoanything[torch]'") from None
     if isinstance(obj, torch.nn.Module):
         return obj
     if callable(obj):
@@ -87,13 +87,13 @@ def _instantiate(obj: Any, ref: str) -> Any:
             model = obj()
         except TypeError as e:
             raise SystemExit(
-                f"pta: could not build {ref} with no arguments ({e}).\n"
+                f"ptoa: could not build {ref} with no arguments ({e}).\n"
                 f"     Add a function that builds it, e.g. `def make(): return {getattr(obj, '__name__', 'Model')}(...)`, and pass file.py:make."
             ) from None
         if isinstance(model, torch.nn.Module):
             return model
-        raise SystemExit(f"pta: {ref} returned {type(model).__name__}, not an nn.Module")
-    raise SystemExit(f"pta: {ref} is not a module, class or function")
+        raise SystemExit(f"ptoa: {ref} returned {type(model).__name__}, not an nn.Module")
+    raise SystemExit(f"ptoa: {ref} is not a module, class or function")
 
 
 def _example_input(args: argparse.Namespace, model: Any) -> Any:
@@ -143,7 +143,7 @@ def _add_input_args(p: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="pta", description=DESCRIPTION, epilog=EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(prog="ptoa", description=DESCRIPTION, epilog=EPILOG, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version=f"papertoanything {__version__}")
     sub = p.add_subparsers(dest="cmd", metavar="COMMAND")
 

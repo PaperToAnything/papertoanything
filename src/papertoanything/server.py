@@ -170,7 +170,7 @@ class LocalServer:
 
     def __repr__(self) -> str:
         state = "closed" if self._closed.is_set() else ("running" if self._httpd else "new")
-        return f"<pta.LocalServer {state} {self.url if self._httpd else ''}>"
+        return f"<ptoa.LocalServer {state} {self.url if self._httpd else ''}>"
 
     # ── data ─────────────────────────────────────────────────────────────────
 
@@ -203,7 +203,7 @@ class LocalServer:
         self._broadcast(_sse("health", data, frame.step))
 
     def watch(self, model: Any, optimizer: Any = None, every: int = 10, **kwargs: Any) -> Any:
-        """``pta.watch`` streaming into this server."""
+        """``ptoa.watch`` streaming into this server."""
         from .health import Watch
 
         kwargs.setdefault("open", False)
@@ -371,7 +371,7 @@ class _Handler(BaseHTTPRequestHandler):
                 self._events()
             return
         if path in ("/", "/index.html"):
-            self._send(200, "text/plain; charset=utf-8", b"papertoanything bridge. Open the Lab with the link that pta printed.\n")
+            self._send(200, "text/plain; charset=utf-8", b"papertoanything bridge. Open the Lab with the link that ptoa printed.\n")
         else:
             self._send(404, "text/plain", b"not found\n")
 

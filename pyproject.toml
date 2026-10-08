@@ -37,13 +37,13 @@ test = ["pytest"]
 
 [project.urls]
 Homepage = "https://papertoanything.com"
-Repository = "https://github.com/PaperToAnything/pta"
+Repository = "https://github.com/PaperToAnything/papertoanything"
 Documentation = "https://papertoanything.com/lab/import/"
 Lab = "https://lab.papertoanything.com"
-"Bug Tracker" = "https://github.com/PaperToAnything/pta/issues"
+"Bug Tracker" = "https://github.com/PaperToAnything/papertoanything/issues"
 
 [project.scripts]
-pta = "papertoanything.cli:main"
+ptoa = "papertoanything.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

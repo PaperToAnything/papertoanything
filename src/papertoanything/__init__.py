@@ -1,9 +1,9 @@
 """papertoanything: see a PyTorch model, and its training, in a browser tab.
 
-    import papertoanything as pta
+    import papertoanything as ptoa
 
-    pta.show(model, example_input)        # architecture in the Lab
-    w = pta.watch(model, optimizer)       # live training health, local tab
+    ptoa.show(model, example_input)        # architecture in the Lab
+    w = ptoa.watch(model, optimizer)       # live training health, local tab
 
 Nothing is uploaded. Links carry the spec in the URL fragment (never sent to a
 server); live views are served from 127.0.1.0 by this process.

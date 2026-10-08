@@ -2,7 +2,7 @@
 
 See a PyTorch model, and watch it train, in the [Paper To Anything Lab](https://lab.papertoanything.com). Nothing is uploaded.
 
-`papertoanything` (`import papertoanything as pta`, command `pta`) turns an `nn.Module` into a model spec the Lab can draw, and streams training health from your Python process into a browser tab on your own machine.
+`papertoanything` (`import papertoanything as ptoa`, command `ptoa`) turns an `nn.Module` into a model spec the Lab can draw, and streams training health from your Python process into a browser tab on your own machine.
 
 ```bash
 pip install papertoanything
@@ -16,32 +16,32 @@ There are three ways to get a model into the Lab. None of them uploads anything.
 
 | | Command | What reaches the Lab | Network |
 |---|---|---|---|
-| **Link** | `pta.show(model, x, mode="link")` | The architecture, in the URL fragment | Only to load the Lab page |
-| **Live bridge** | `pta.watch(model, optimizer)` or `pta.show(..., mode="local")` | Architecture, forward-pass tensors and training health, read from your own process by your own browser | Only to load the Lab page |
-| **File** | `pta.save(model, "m.pta", example_input=x)` | A `.pta` file you drop on the Lab | None |
+| **Link** | `ptoa.show(model, x, mode="link")` | The architecture, in the URL fragment | Only to load the Lab page |
+| **Live bridge** | `ptoa.watch(model, optimizer)` or `ptoa.show(..., mode="local")` | Architecture, forward-pass tensors and training health, read from your own process by your own browser | Only to load the Lab page |
+| **File** | `ptoa.save(model, "m.pta", example_input=x)` | A `.pta` file you drop on the Lab | None |
 
 * **Link.** The spec (the blocks and how they connect; no weights, no data) is compressed into the part of the URL after `#`. Browsers never send that part to a server.
-* **Live bridge.** `pta.show(..., mode="local")` and `pta.watch` start a small server in your Python process on `127.0.0.1`, on a random port, protected by a random token for the session. They then open `https://lab.papertoanything.com/?bridge=http://127.0.0.1:<port>&token=<token>`. The Lab page runs in your browser and reads the bridge directly; the data goes from your process to your browser tab and nowhere else.
-* **File.** `pta save` writes a JSON file. Drop it on the Lab. This works in every browser and on every machine, with no server and no connection to your process.
+* **Live bridge.** `ptoa.show(..., mode="local")` and `ptoa.watch` start a small server in your Python process on `127.0.0.1`, on a random port, protected by a random token for the session. They then open `https://lab.papertoanything.com/?bridge=http://127.0.0.1:<port>&token=<token>`. The Lab page runs in your browser and reads the bridge directly; the data goes from your process to your browser tab and nowhere else.
+* **File.** `ptoa save` writes a JSON file. Drop it on the Lab. This works in every browser and on every machine, with no server and no connection to your process.
 
 ## Quick starts
 
 ### Show an architecture
 
 ```python
-import papertoanything as pta
+import papertoanything as ptoa
 
-pta.show(model, example_input)                  # prints and opens a link
-pta.show(model, example_input, mode="local")    # live bridge, with one captured forward pass
-pta.show(model, example_input, mode="file")     # writes <name>.pta
+ptoa.show(model, example_input)                  # prints and opens a link
+ptoa.show(model, example_input, mode="local")    # live bridge, with one captured forward pass
+ptoa.show(model, example_input, mode="file")     # writes <name>.pta
 ```
 
 ### Watch training
 
 ```python
-import papertoanything as pta
+import papertoanything as ptoa
 
-with pta.watch(model, optimizer, every=10) as w:
+with ptoa.watch(model, optimizer, every=10) as w:
     for x, y in loader:
         loss = loss_fn(model(x), y)
         optimizer.zero_grad(); loss.backward(); optimizer.step()
@@ -54,7 +54,7 @@ with pta.watch(model, optimizer, every=10) as w:
 * If the model returns a scalar loss (nanoGPT returns `(logits, loss)`), the loss is picked up automatically.
 * `val_loss` is a number or a function; a function is called every `val_every` steps.
 * `open=False` skips opening a browser; `w.url` has the URL.
-* In a notebook, `w = pta.watch(...)` returns at once and the server keeps running in a background thread; call `w.close()` when done.
+* In a notebook, `w = ptoa.watch(...)` returns at once and the server keeps running in a background thread; call `w.close()` when done.
 
 A tiny GPT that trains on the CPU in under a minute:
 
@@ -67,13 +67,13 @@ python examples/watch_tiny_gpt.py --break lr      # learning rate too high: loss
 ### Command line
 
 ```bash
-pta --version
-pta inspect model.py:GPT --input-shape 1,64        # table of blocks
-pta inspect model.py:GPT --json > spec.json
-pta link spec.json                                 # open the Lab with the architecture
-pta decode "https://lab.papertoanything.com/#s=..."
-pta save model.py:GPT -o gpt.pta --input-shape 1,64
-pta serve spec.json                                # live bridge until Ctrl+C
+ptoa --version
+ptoa inspect model.py:GPT --input-shape 1,64        # table of blocks
+ptoa inspect model.py:GPT --json > spec.json
+ptoa link spec.json                                 # open the Lab with the architecture
+ptoa decode "https://lab.papertoanything.com/#s=..."
+ptoa save model.py:GPT -o gpt.pta --input-shape 1,64
+ptoa serve spec.json                                # live bridge until Ctrl+C
 ```
 
 `model.py:Name` may name a class that builds with no arguments, a function that returns a model, or a model instance.
@@ -90,7 +90,7 @@ trainer = L.Trainer(callbacks=[PTACallback(every=20)])
 
 ## Browser notes for the live bridge
 
-The hosted Lab is an `https://` page talking to `http://127.0.0.1`. Chrome, Edge and Firefox treat loopback as a secure context, so this works. Chrome may show a one-time prompt, "allow access to devices on your local network"; allow it for `lab.papertoanything.com`. Safari blocks `https` pages from reading `http://127.0.0.1`. If the bridge does not connect, or you work on a remote machine, in a locked-down browser or without a network, use file mode: `pta save` (or `pta.save(...)`), then drop the `.pta` file on the Lab. File mode works everywhere.
+The hosted Lab is an `https://` page talking to `http://127.0.0.1`. Chrome, Edge and Firefox treat loopback as a secure context, so this works. Chrome may show a one-time prompt, "allow access to devices on your local network"; allow it for `lab.papertoanything.com`. Safari blocks `https` pages from reading `http://127.0.0.1`. If the bridge does not connect, or you work on a remote machine, in a locked-down browser or without a network, use file mode: `ptoa save` (or `ptoa.save(...)`), then drop the `.pta` file on the Lab. File mode works everywhere.
 
 ## What `watch` measures
 
@@ -105,7 +105,7 @@ Between frames the hooks return immediately. On a frame step the statistics are 
 
 ## How a model becomes blocks
 
-`pta.from_module(model, example_input)` tries `torch.fx` first. If the model has data-dependent control flow, it runs one forward pass with hooks instead and records what ran. Without an example input and without fx, it falls back to the module tree and warns that the connections are a guess.
+`ptoa.from_module(model, example_input)` tries `torch.fx` first. If the model has data-dependent control flow, it runs one forward pass with hooks instead and records what ran. Without an example input and without fx, it falls back to the module tree and warns that the connections are a guess.
 
 It recognises `nn.Embedding` (and learned position tables), `nn.MultiheadAttention` and attention modules that carry a head count (nanoGPT's `CausalSelfAttention`, Hugging Face `GPT2Attention`, BERT self-attention), MLP modules, `nn.Linear` and Hugging Face `Conv1D`, LayerNorm and RMSNorm, common activations, softmax, losses, and residual additions. Tied output layers become `unembed` with `tiedTo`. Anything else becomes a `group` block labelled with its class name; it does not raise on a model it does not know. The model is put in eval mode for the pass, run without gradients, and restored.
 
@@ -129,7 +129,7 @@ It recognises `nn.Embedding` (and learned position tables), `nn.MultiheadAttenti
 
 * PyTorch 2.0 or newer: `from_module`, `capture`, `show`, `watch`.
 * Hugging Face `transformers` `Trainer` and PyTorch Lightning, through callbacks.
-* Anything else: build a spec yourself (`pta.ModelSpec`) and use link, bridge or file mode with it.
+* Anything else: build a spec yourself (`ptoa.ModelSpec`) and use link, bridge or file mode with it.
 
 ## Limitations
 
@@ -145,8 +145,8 @@ It recognises `nn.Embedding` (and learned position tables), `nn.MultiheadAttenti
 ## Development
 
 ```bash
-git clone https://github.com/PaperToAnything/pta
-cd pta
+git clone https://github.com/PaperToAnything/papertoanything
+cd ptoa
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[test]"
 python -m pytest -q
@@ -158,12 +158,12 @@ Documentation: https://papertoanything.com/lab/import/
 ## Citation
 
 ```bibtex
-@software{dhruvapgowda2026pta,
+@software{dhruvapgowda2026ptoa,
   author  = {Dhruva P Gowda},
   title   = {papertoanything: see a PyTorch model and its training in the Paper To Anything Lab},
   year    = {2026},
   version = {0.1.0},
-  url     = {https://github.com/PaperToAnything/pta},
+  url     = {https://github.com/PaperToAnything/papertoanything},
   license = {Apache-2.0}
 }
 ```

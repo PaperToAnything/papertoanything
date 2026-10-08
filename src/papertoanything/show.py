@@ -1,4 +1,4 @@
-"""``pta.show``, ``pta.save`` and ``pta.load``: the three bridge transports."""
+"""``ptoa.show``, ``ptoa.save`` and ``ptoa.load``: the three bridge transports."""
 
 from __future__ import annotations
 

@@ -1,8 +1,8 @@
-"""``pta.watch``: live training health for a real PyTorch loop.
+"""``ptoa.watch``: live training health for a real PyTorch loop.
 
 One line in a training script or notebook::
 
-    w = pta.watch(model, optimizer)          # opens the Lab on a local bridge
+    w = ptoa.watch(model, optimizer)          # opens the Lab on a local bridge
     for batch in data:
         loss = model(batch)
         loss.backward(); optimizer.step(); optimizer.zero_grad()
@@ -51,7 +51,7 @@ def _torch():
     try:
         import torch
     except ImportError:  # pragma: no cover
-        raise ImportError("pta.watch needs PyTorch: pip install 'papertoanything[torch]'") from None
+        raise ImportError("ptoa.watch needs PyTorch: pip install 'papertoanything[torch]'") from None
     return torch
 
 
@@ -262,7 +262,7 @@ class _Tracked:
 
 
 class Watch:
-    """Handle returned by ``pta.watch``. See the module docstring."""
+    """Handle returned by ``ptoa.watch``. See the module docstring."""
 
     def __init__(
         self,
@@ -286,7 +286,7 @@ class Watch:
     ) -> None:
         torch = _torch()
         if not isinstance(model, torch.nn.Module):
-            raise TypeError(f"pta.watch expects an nn.Module, got {type(model).__name__}")
+            raise TypeError(f"ptoa.watch expects an nn.Module, got {type(model).__name__}")
         if every < 1:
             raise ValueError("every must be at least 1")
         self.model = model
@@ -356,7 +356,7 @@ class Watch:
                 warnings.simplefilter("ignore")
                 self.spec = analyze(self.model, example_input).spec
         except Exception as e:  # never break the user's training loop
-            warnings.warn(f"pta.watch: could not map the model ({e}); block stats disabled", stacklevel=3)
+            warnings.warn(f"ptoa.watch: could not map the model ({e}); block stats disabled", stacklevel=3)
             from .spec import Block, BlockParams, Origin
 
             self.spec = ModelSpec(type(self.model).__name__, [Block("g0", "group", BlockParams(), [], label=type(self.model).__name__)], "g0", Origin("torch"))
@@ -510,7 +510,7 @@ class Watch:
                 if out.requires_grad:
                     out.register_hook(self._make_grad_hook(tr))
             except Exception as e:  # stats must never break training
-                self._warn_once(f"stats:{tr.bid}", f"pta.watch: skipped stats for {tr.bid}: {e}")
+                self._warn_once(f"stats:{tr.bid}", f"ptoa.watch: skipped stats for {tr.bid}: {e}")
 
         return post
 
@@ -641,7 +641,7 @@ class Watch:
         if loss is not None:
             v = _num(loss)
             if v is None and self.warn_nonfinite and _is_nonfinite(loss):
-                self._warn_once("loss", f"pta.watch: loss is not finite at step {self.step_count}")
+                self._warn_once("loss", f"ptoa.watch: loss is not finite at step {self.step_count}")
         if self.optimizer is not None:
             frame = self._deferred
             if frame is not None and v is not None:
@@ -697,7 +697,7 @@ class Watch:
         self.close()
 
     def __repr__(self) -> str:
-        return f"<pta.Watch {type(self.model).__name__} step={self.step_count} frames={len(self.frames)} url={self.url}>"
+        return f"<ptoa.Watch {type(self.model).__name__} step={self.step_count} frames={len(self.frames)} url={self.url}>"
 
     # ── internals ────────────────────────────────────────────────────────────
 
@@ -769,7 +769,7 @@ class Watch:
             try:
                 self._last_val = _num(self.val_loss() if callable(self.val_loss) else self.val_loss)
             except Exception as e:
-                self._warn_once("val", f"pta.watch: val_loss callback failed: {e}")
+                self._warn_once("val", f"ptoa.watch: val_loss callback failed: {e}")
         memory = None
         if self._cuda:
             try:
@@ -809,11 +809,11 @@ class Watch:
             try:
                 sink(frame)
             except Exception as e:
-                self._warn_once(f"sink:{id(sink)}", f"pta.watch: sink failed: {e}")
+                self._warn_once(f"sink:{id(sink)}", f"ptoa.watch: sink failed: {e}")
 
     def _check_finite(self, bid: str, what: str, st: TensorStats) -> None:
         if self.warn_nonfinite and (st.nanCount or st.infCount):
-            self._warn_once(f"nf:{bid}:{what}", f"pta.watch: {st.nanCount} NaN / {st.infCount} Inf in the {what} of block {bid} at step {self.step_count}")
+            self._warn_once(f"nf:{bid}:{what}", f"ptoa.watch: {st.nanCount} NaN / {st.infCount} Inf in the {what} of block {bid} at step {self.step_count}")
 
     def _warn_once(self, key: str, msg: str) -> None:
         if key not in self._warned:
